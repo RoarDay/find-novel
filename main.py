@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""
+极简多站小说爬虫 —— 入口脚本
+
+用法：
+    python main.py <目录页URL> [选项]
+
+示例：
+    python main.py https://www.92yanqing.com/read/36979/
+    python main.py https://www.92yanqing.com/read/36979/ --workers 10 --no-proxy
+"""
+
+import argparse
+import sys
+from bs4 import BeautifulSoup
+from novel_crawler import ParserRegistry, DownloadEngine
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="极简多站小说爬虫")
+    parser.add_argument("url", help="小说目录页 URL")
+    parser.add_argument("--workers", type=int, default=8, help="并发线程数 (默认: 8)")
+    parser.add_argument("--proxy", action="store_true", default=False, help="启用免费代理池")
+    parser.add_argument("--delay-min", type=float, default=0.1, help="最小请求延迟秒数 (默认: 0.1)")
+    parser.add_argument("--delay-max", type=float, default=0.3, help="最大请求延迟秒数 (默认: 0.3)")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    catalog_url = args.url
+
+    # 1. 自动匹配解析器
+    registry = ParserRegistry()
+    try:
+        parser = registry.get_parser(catalog_url)
+        print(f"[匹配] 使用解析器: {parser.__class__.__name__}")
+    except ValueError as e:
+        print(f"[错误] {e}")
+        print(f"当前支持的站点: {', '.join(registry.list_supported())}")
+        sys.exit(1)
+
+    # 2. 初始化下载引擎
+    engine = DownloadEngine(
+        max_workers=args.workers,
+        use_proxy=args.proxy,
+        proxy_test_url=catalog_url if args.proxy else None,
+        delay=(args.delay_min, args.delay_max),
+    )
+
+    # 3. 获取目录
+    print("[1/3] 获取目录...")
+    catalog_html = engine.fetch(catalog_url)
+    if not catalog_html:
+        print("[错误] 目录页获取失败")
+        sys.exit(1)
+
+    soup = BeautifulSoup(catalog_html, "lxml")
+    chapters = parser.parse_catalog(soup, catalog_url)
+    if not chapters:
+        print("[错误] 未解析到章节")
+        sys.exit(1)
+    print(f"[1/3] 共 {len(chapters)} 章")
+
+    # 4. 获取小说元数据（标题、作者）
+    novel_name = soup.select_one("h1")
+    novel_name = novel_name.get_text(strip=True) if novel_name else "未知小说"
+    author_tag = soup.select_one(".bookdes p:contains('作者')")
+    author = "未知"
+    if author_tag:
+        author = author_tag.get_text(strip=True).replace("作者：", "")
+    # fallback: 从 meta 标签取
+    meta_author = soup.find("meta", property="og:novel:author")
+    if meta_author:
+        author = meta_author.get("content", author)
+
+    # 5. 并发下载
+    print(f"[2/3] 开始下载（线程数: {args.workers}）...")
+
+    def parse_chapter(url: str):
+        """下载单章（含分页）"""
+        all_text = []
+        current_url = url
+        page_count = 0
+        max_pages = 10
+
+        while current_url and page_count < max_pages:
+            page_count += 1
+            html = engine.fetch(current_url)
+            if not html:
+                break
+            page_soup = BeautifulSoup(html, "lxml")
+            text = parser.parse_content(page_soup)
+            if text:
+                all_text.append(text)
+
+            next_url = parser.has_next_page(page_soup, current_url)
+            if not next_url:
+                break
+            current_url = next_url
+
+        return "\n".join(all_text) if all_text else None
+
+    def on_progress(completed: int, total: int):
+        print(f"  -> 已完成: {completed}/{total} ({completed * 100 // total}%)")
+
+    results, failed = engine.download_all(chapters, parse_chapter, on_progress)
+
+    # 6. 写入文件
+    print("[3/3] 合并写入文件...")
+    filename = engine.save(novel_name, author, chapters, results)
+
+    print(f"\n[完成] 保存至: {filename}")
+    if failed:
+        print(f"⚠️  失败章节: {len(failed)} 章")
+        for idx, title, _ in failed[:5]:
+            print(f"   - 第{idx}章 {title}")
+        if len(failed) > 5:
+            print(f"   ... 还有 {len(failed) - 5} 章")
+    else:
+        print("✅ 全部章节下载成功")
+
+
+if __name__ == "__main__":
+    main()
+
+
+#  python main.py https://www.92yanqing.com/read/43361/ --workers 5 --proxy
