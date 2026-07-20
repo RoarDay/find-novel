@@ -1,6 +1,5 @@
-from .base import BaseParser
+from .base import BaseParser, SearchResult
 from .registry import ParserRegistry
 from .engine import DownloadEngine
-from .proxy import ProxyPool
 
-__all__ = ["BaseParser", "ParserRegistry", "DownloadEngine", "ProxyPool"]
+__all__ = ["BaseParser", "SearchResult", "ParserRegistry", "DownloadEngine"]

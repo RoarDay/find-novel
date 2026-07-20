@@ -1,7 +1,7 @@
 import re
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from novel_crawler.base import BaseParser
+from novel_crawler.base import BaseParser, SearchResult
 
 
 class MinYuanParser(BaseParser):
@@ -47,3 +47,23 @@ class MinYuanParser(BaseParser):
         if re.search(r"_\d+\.html$", next_href):
             return next_href
         return None
+
+    def search(self, keyword: str, fetch) -> list:
+        """POST /search/ 搜索。"""
+        url = "https://www.min-yuan.com/search/"
+        html = fetch(url, method="POST", data={"searchkey": keyword})
+        if not html:
+            return []
+        soup = BeautifulSoup(html, "lxml")
+        results = []
+        for item in soup.select("div.item"):
+            a = item.select_one("dl dt a")
+            if not a or not a.get("href"):
+                continue
+            # ponytail: 搜索页 btm 区是固定标签非作者，无可靠作者字段，留空
+            results.append(SearchResult(
+                title=a.get_text(strip=True),
+                url=urljoin("https://www.min-yuan.com/", a["href"]),
+                source=self.domain,
+            ))
+        return results

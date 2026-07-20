@@ -51,3 +51,9 @@ temp/
 
 
 *.pyc
+
+
+# IDE specific files
+.trellis
+.claude
+AGENTS.md

@@ -37,9 +37,19 @@ class ParserRegistry:
     def get_parser(self, url: str) -> BaseParser:
         domain = urlparse(url).netloc
         for key, parser in self._parsers.items():
-            if key in domain:
+            if domain == key or domain.endswith("." + key):
                 return parser
         raise ValueError(f"未找到支持该域名的解析器: {domain}")
 
     def list_supported(self) -> list[str]:
         return list(self._parsers.keys())
+
+    def search_all(self, keyword: str, fetch) -> list:
+        """聚合搜索所有已注册站点，单站失败不影响其它。"""
+        all_results = []
+        for parser in self._parsers.values():
+            try:
+                all_results.extend(parser.search(keyword, fetch))
+            except Exception as e:
+                print(f"[搜索] {parser.domain} 失败: {e}")
+        return all_results

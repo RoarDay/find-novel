@@ -6,15 +6,12 @@ import concurrent.futures
 import threading
 from typing import Callable
 import requests
-from .proxy import ProxyPool
 
 
 class DownloadEngine:
     def __init__(
         self,
         max_workers: int = 5,
-        use_proxy: bool = False,
-        proxy_test_url: str | None = None,
         delay: tuple[float, float] = (0.1, 0.3),
     ):
         self.session = requests.Session()
@@ -26,35 +23,48 @@ class DownloadEngine:
         )
         self.max_workers = max_workers
         self.delay = delay
-        self.use_proxy = use_proxy
-        self.proxy_pool = ProxyPool() if use_proxy else None
         self.lock = threading.Lock()
 
-        if use_proxy and proxy_test_url:
-            self.proxy_pool.refresh(test_url=proxy_test_url, count=20)
-            if self.proxy_pool.is_empty():
-                print("[Engine] 无可用代理，已回退到直连模式")
-                self.use_proxy = False
-
-    def fetch(self, url: str, retries: int = 3) -> str | None:
-        """带代理轮换和指数退避的请求。"""
+    def fetch(self, url: str, retries: int = 3, method: str = "GET", data: dict | None = None) -> str | None:
+        """带指数退避的请求。method/data 支持 POST（搜索用）。"""
         for i in range(retries):
             try:
                 time.sleep(random.uniform(*self.delay))
-
-                proxies = None
-                if self.use_proxy:
-                    proxy = self.proxy_pool.get()
-                    if proxy:
-                        proxies = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
-
-                resp = self.session.get(url, timeout=15, proxies=proxies)
-                resp.encoding = "utf-8"
+                if method == "POST":
+                    resp = self.session.post(url, data=data, timeout=15)
+                else:
+                    resp = self.session.get(url, timeout=15)
+                resp.encoding = resp.encoding or resp.apparent_encoding or "utf-8"
                 if resp.status_code == 200:
                     return resp.text
             except Exception:
                 time.sleep(0.5 * (i + 1))
         return None
+
+    def fetch_chapter(self, url: str, parser, max_pages: int = 10) -> str | None:
+        """下载单章（含分页），返回合并后的正文。"""
+        from bs4 import BeautifulSoup
+
+        all_text = []
+        current_url = url
+        page_count = 0
+
+        while current_url and page_count < max_pages:
+            page_count += 1
+            html = self.fetch(current_url)
+            if not html:
+                break
+            soup = BeautifulSoup(html, "lxml")
+            text = parser.parse_content(soup)
+            if text:
+                all_text.append(text)
+
+            next_url = parser.has_next_page(soup, current_url)
+            if not next_url:
+                break
+            current_url = next_url
+
+        return "\n".join(all_text) if all_text else None
 
     def download_all(
         self,
@@ -92,6 +102,22 @@ class DownloadEngine:
                 if on_progress and (completed % 50 == 0 or completed == len(chapters)):
                     on_progress(completed, len(chapters))
 
+        # 自动重试失败章节一次
+        if failed:
+            retry_targets = failed[:]
+            failed.clear()
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.max_workers
+            ) as executor:
+                futures = {
+                    executor.submit(worker, idx, title, url): idx
+                    for idx, title, url in retry_targets
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    idx, title, content = future.result()
+                    if content is not None:
+                        results[idx] = (title, content)
+
         return results, failed
 
     def save(
@@ -103,8 +129,15 @@ class DownloadEngine:
         filename: str | None = None,
     ) -> str:
         """按顺序写入 TXT 文件。"""
+        import re
+
         if filename is None:
             filename = f"{novel_name}.txt"
+        # 清理 Windows 非法字符和控制字符
+        filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", filename)
+        filename = filename.strip(". ")
+        if not filename:
+            filename = "novel.txt"
         with open(filename, "w", encoding="utf-8") as f:
             f.write(f"{novel_name}\n作者：{author}\n\n")
             for idx in range(1, len(chapters) + 1):

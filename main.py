@@ -3,34 +3,57 @@
 极简多站小说爬虫 —— 入口脚本
 
 用法：
-    python main.py <目录页URL> [选项]
+    python main.py <目录页URL> [选项]            # 直接下载
+    python main.py --search <书名> [选项]        # 聚合搜索后交互式选书
 
 示例：
     python main.py https://www.92yanqing.com/read/36979/
-    python main.py https://www.92yanqing.com/read/36979/ --workers 10 --no-proxy
+    python main.py --search 斗破苍穹 --workers 10
 """
 
 import argparse
 import sys
+import time
 from bs4 import BeautifulSoup
 from novel_crawler import ParserRegistry, DownloadEngine
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="极简多站小说爬虫")
-    parser.add_argument("url", help="小说目录页 URL")
+    parser.add_argument("url", nargs="?", default=None, help="小说目录页 URL（与 --search 二选一）")
+    parser.add_argument("--search", type=str, default=None, help="按书名聚合搜索所有站点，交互式选书")
     parser.add_argument("--workers", type=int, default=8, help="并发线程数 (默认: 8)")
-    parser.add_argument("--proxy", action="store_true", default=False, help="启用免费代理池")
     parser.add_argument("--delay-min", type=float, default=0.1, help="最小请求延迟秒数 (默认: 0.1)")
     parser.add_argument("--delay-max", type=float, default=0.3, help="最大请求延迟秒数 (默认: 0.3)")
+    parser.add_argument("--start", type=int, default=1, help="起始章节索引，从1开始 (默认: 1)")
+    parser.add_argument("--end", type=int, default=None, help="结束章节索引 (默认: 全部)")
+    parser.add_argument("--output", type=str, default=None, help="自定义输出文件名")
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-    catalog_url = args.url
+def search_and_pick(keyword, engine, registry):
+    """聚合搜索 + 交互式编号选择，返回目录页 URL 或 None（取消）。"""
+    print(f"[搜索] '{keyword}' 聚合搜索所有站点...")
+    results = registry.search_all(keyword, engine.fetch)
+    if not results:
+        print("[搜索] 未找到结果")
+        return None
+    for i, r in enumerate(results, 1):
+        line = f"  {i}. [{r.source}] {r.title}"
+        if r.author:
+            line += f" / {r.author}"
+        print(line)
+    while True:
+        choice = input("输入编号下载（0 取消）: ").strip()
+        if choice in ("0", ""):
+            return None
+        if choice.isdigit() and 1 <= int(choice) <= len(results):
+            return results[int(choice) - 1].url
+        print(f"[错误] 请输入 1-{len(results)} 的编号")
 
-    # 1. 自动匹配解析器
+
+def download(catalog_url, args, engine):
+    """下载一本书：取目录 → 切片 → 并发下载 → 合并写文件。"""
     registry = ParserRegistry()
     try:
         parser = registry.get_parser(catalog_url)
@@ -40,15 +63,7 @@ def main():
         print(f"当前支持的站点: {', '.join(registry.list_supported())}")
         sys.exit(1)
 
-    # 2. 初始化下载引擎
-    engine = DownloadEngine(
-        max_workers=args.workers,
-        use_proxy=args.proxy,
-        proxy_test_url=catalog_url if args.proxy else None,
-        delay=(args.delay_min, args.delay_max),
-    )
-
-    # 3. 获取目录
+    # 1. 获取目录
     print("[1/3] 获取目录...")
     catalog_html = engine.fetch(catalog_url)
     if not catalog_html:
@@ -60,57 +75,42 @@ def main():
     if not chapters:
         print("[错误] 未解析到章节")
         sys.exit(1)
-    print(f"[1/3] 共 {len(chapters)} 章")
 
-    # 4. 获取小说元数据（标题、作者）
+    # 2. 章节范围切片
+    start = max(1, args.start)
+    end = min(args.end if args.end is not None else len(chapters), len(chapters))
+    if start > end:
+        print("[错误] --start 不能大于 --end")
+        sys.exit(1)
+    chapters = chapters[start - 1:end]
+    print(f"[1/3] 共 {len(chapters)} 章（范围: {start}-{end}）")
+
+    # 3. 获取小说元数据（标题、作者）
     novel_name = soup.select_one("h1")
     novel_name = novel_name.get_text(strip=True) if novel_name else "未知小说"
-    author_tag = soup.select_one(".bookdes p:contains('作者')")
     author = "未知"
-    if author_tag:
-        author = author_tag.get_text(strip=True).replace("作者：", "")
-    # fallback: 从 meta 标签取
     meta_author = soup.find("meta", property="og:novel:author")
     if meta_author:
         author = meta_author.get("content", author)
 
-    # 5. 并发下载
+    # 4. 并发下载
     print(f"[2/3] 开始下载（线程数: {args.workers}）...")
-
-    def parse_chapter(url: str):
-        """下载单章（含分页）"""
-        all_text = []
-        current_url = url
-        page_count = 0
-        max_pages = 10
-
-        while current_url and page_count < max_pages:
-            page_count += 1
-            html = engine.fetch(current_url)
-            if not html:
-                break
-            page_soup = BeautifulSoup(html, "lxml")
-            text = parser.parse_content(page_soup)
-            if text:
-                all_text.append(text)
-
-            next_url = parser.has_next_page(page_soup, current_url)
-            if not next_url:
-                break
-            current_url = next_url
-
-        return "\n".join(all_text) if all_text else None
+    t0 = time.perf_counter()
 
     def on_progress(completed: int, total: int):
         print(f"  -> 已完成: {completed}/{total} ({completed * 100 // total}%)")
 
-    results, failed = engine.download_all(chapters, parse_chapter, on_progress)
+    results, failed = engine.download_all(
+        chapters, lambda url: engine.fetch_chapter(url, parser), on_progress
+    )
+    elapsed = time.perf_counter() - t0
 
-    # 6. 写入文件
+    # 5. 写入文件
     print("[3/3] 合并写入文件...")
-    filename = engine.save(novel_name, author, chapters, results)
+    filename = engine.save(novel_name, author, chapters, results, filename=args.output)
 
     print(f"\n[完成] 保存至: {filename}")
+    print(f"⏱️  耗时: {elapsed:.1f} 秒")
     if failed:
         print(f"⚠️  失败章节: {len(failed)} 章")
         for idx, title, _ in failed[:5]:
@@ -121,8 +121,28 @@ def main():
         print("✅ 全部章节下载成功")
 
 
+def main():
+    args = parse_args()
+
+    if not args.url and not args.search:
+        print("[错误] 必须提供目录页 URL 或 --search 关键词")
+        print("  用法: python main.py <URL>  或  python main.py --search <书名>")
+        sys.exit(1)
+
+    engine = DownloadEngine(
+        max_workers=args.workers,
+        delay=(args.delay_min, args.delay_max),
+    )
+
+    catalog_url = args.url
+    if args.search:
+        registry = ParserRegistry()
+        catalog_url = search_and_pick(args.search, engine, registry)
+        if not catalog_url:
+            return
+
+    download(catalog_url, args, engine)
+
+
 if __name__ == "__main__":
     main()
-
-
-#  python main.py https://www.92yanqing.com/read/43361/ --workers 5 --proxy

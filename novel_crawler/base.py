@@ -1,6 +1,15 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
+
+@dataclass
+class SearchResult:
+    title: str       # 书名
+    url: str         # 目录页绝对 URL（直接喂给下载流程）
+    source: str      # 来源站域名，用于聚合显示
+    author: str = "" # 可选，作者
 
 
 class BaseParser(ABC):
@@ -35,11 +44,11 @@ class BaseParser(ABC):
         """
         检查是否有下一页（分页）。
         返回: 下一页绝对URL，或 None。
-        默认实现检测常见的 _2.html、_3.html 模式。
+        默认实现检测常见的 next_url 和 rel=next 模式。
         特殊站点可覆盖此方法。
         """
         import re
-        next_link = soup.select_one('a#next_url')
+        next_link = soup.select_one('a#next_url') or soup.select_one("a[rel='next']")
         if not next_link:
             return None
         next_href = next_link.get('href', '')
@@ -47,3 +56,11 @@ class BaseParser(ABC):
         if re.search(r'_\d+\.html$', next_href):
             return next_href
         return None
+
+    def search(self, keyword: str, fetch) -> list:
+        """
+        按关键词搜索本站。
+        fetch: callable(url, method="GET", data=None) -> html str | None
+        返回: [SearchResult, ...]。默认返回空（站点未实现搜索）。
+        """
+        return []
