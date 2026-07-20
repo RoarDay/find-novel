@@ -17,6 +17,8 @@ import time
 from bs4 import BeautifulSoup
 from novel_crawler import ParserRegistry, DownloadEngine
 
+DOWNLOAD_DIR = "novels"  # 小说下载目录（已加入 .gitignore）
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="极简多站小说爬虫")
@@ -107,7 +109,11 @@ def download(catalog_url, args, engine):
 
     # 5. 写入文件
     print("[3/3] 合并写入文件...")
-    filename = engine.save(novel_name, author, chapters, results, filename=args.output)
+    filename = engine.save(
+        novel_name, author, chapters, results,
+        filename=args.output,
+        output_dir=None if args.output else DOWNLOAD_DIR,
+    )
 
     print(f"\n[完成] 保存至: {filename}")
     print(f"⏱️  耗时: {elapsed:.1f} 秒")

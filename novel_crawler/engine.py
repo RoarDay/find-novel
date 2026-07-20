@@ -127,9 +127,10 @@ class DownloadEngine:
         chapters: list[tuple[str, str]],
         results: dict[int, tuple[str, str | None]],
         filename: str | None = None,
+        output_dir: str | None = None,
     ) -> str:
-        """按顺序写入 TXT 文件。"""
-        import re
+        """按顺序写入 TXT 文件。output_dir 指定时写入子目录（自动创建）。"""
+        import re, os
 
         if filename is None:
             filename = f"{novel_name}.txt"
@@ -138,6 +139,9 @@ class DownloadEngine:
         filename = filename.strip(". ")
         if not filename:
             filename = "novel.txt"
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+            filename = os.path.join(output_dir, filename)
         with open(filename, "w", encoding="utf-8") as f:
             f.write(f"{novel_name}\n作者：{author}\n\n")
             for idx in range(1, len(chapters) + 1):
