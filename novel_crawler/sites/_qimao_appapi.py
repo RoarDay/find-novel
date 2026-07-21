@@ -1,10 +1,12 @@
 """七猫 App API：完整目录（签名）+ 全本下载（zip + AES）。
 
-签名 2026-07-21 实测有效（research/sign.md）。
+签名 + chapter-list + download zip + AES 全链路线上已验证 2026-07-21
+（book 1860026：1063 章目录 + 全本解密，首章 3055 字明文）。
 - **核心（签名 + chapter-list 完整目录）零新依赖**（stdlib hashlib）。
 - 全本下载的 AES 懒加载 pycryptodome（缺失给清晰错误，不破坏核心/目录功能）。
 
 下划线前缀：registry 不当 parser 加载；QimaoParser 委托本模块。
+逆向依据见 docs/research/qimao-sign.md。
 """
 
 import base64

@@ -5,7 +5,8 @@
 ByteDance secsdk 锁成 0 字节 body，APP API 签名墙；超 BaseParser 范围）。
 推荐池缺口用分类/排行（自带 abstract）补足。
 
-详细逆向依据：.trellis/tasks/07-21-fanqienovel/research/probe.md（2026-07-21 实测）。
+线上已验证 2026-07-21：blurb / recommend(9本) / 目录 / 正文 PUA 解密（2410字）全通。
+逆向依据见 docs/research/fanqie-probe.md。
 """
 
 import json
@@ -29,7 +30,9 @@ HEADERS = {
 }
 
 _PUA_RANGE = range(0xE000, 0xF900)  # U+E000..U+F8FF 私用区
-_LOCK_MARKERS = ("SVIP", "下载番茄", "阅读全文", "本章字数")
+# VIP 锁章仅给 ~2 段预览；免费章 60+ 段。<p> 数是可靠锁信号
+# （「下载番茄/阅读全文/本章字数」等标记全站页脚都有，不能作锁判据）
+_LOCK_PARAGRAPH_THRESHOLD = 2
 
 
 def _decode_pua(text: str) -> str:
@@ -108,12 +111,12 @@ def _flatten_chapters(page: dict) -> list[tuple[str, str]]:
 
 
 def _book_list(resp: dict) -> list[dict]:
-    """defensive：API 返回 data:[...] 或 data.book_list:[...] 都兼容。"""
+    """defensive：recommend→data.list、category→data.book_list、裸 data:[...] 都兼容。"""
     data = (resp or {}).get("data")
     if isinstance(data, list):
         return data
     if isinstance(data, dict):
-        return data.get("book_list") or []
+        return data.get("book_list") or data.get("list") or []
     return []
 
 
@@ -144,14 +147,10 @@ class FanqieParser(BaseParser):
         return _flatten_chapters(_page_from_soup(soup))
 
     def parse_content(self, soup: BeautifulSoup) -> str:
-        """`.muye-reader-content` 内 <p> → PUA 解密；VIP 锁章返回 ''。"""
-        html = str(soup)
-        if any(m in html for m in _LOCK_MARKERS):
-            # ponytail: 锁章 HTML 含 VIP/SVIP/下载番茄 标记，web 不可读全文
-            return ""
+        """`.muye-reader-content` 内 <p> → PUA 解密；VIP 锁章（≤2 段预览）返回 ''。"""
         container = soup.select_one(".muye-reader-content") or soup
         ps = container.find_all("p")
-        if len(ps) <= 2:
+        if len(ps) <= _LOCK_PARAGRAPH_THRESHOLD:
             return ""  # 锁章仅 2 段预览
         raw = "\n".join(p.get_text(strip=True) for p in ps if p.get_text(strip=True))
         return _decode_pua(raw)

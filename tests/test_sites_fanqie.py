@@ -50,21 +50,38 @@ def test_parse_catalog_from_inline_state():
 
 
 def test_parse_content_locked_chapter_returns_empty():
-    # 含 VIP 标记 + 仅 1 段 → 锁章，返回空
+    # VIP 锁章仅 2 段预览 → 计数判锁返回空
     html = (
         '<html><body><div class="muye-reader-content noselect">'
-        "<p>本章 VIP 内容需下载番茄小说</p>"
+        "<p>本章 VIP 内容预览段一</p>"
+        "<p>本章 VIP 内容预览段二</p>"
         '</div><div>下载番茄 阅读全文 SVIP</div></body></html>'
     )
     soup = BeautifulSoup(html, "lxml")
     assert FanqieParser().parse_content(soup) == ""
 
 
+def test_parse_content_not_locked_despite_page_markers():
+    """回归：锁标记（下载番茄/阅读全文）全站页脚都有，不能作锁判据。
+    段落多（免费全章）+ 含标记 → 仍应正常解密，不返回空。"""
+    items = list(FONT_MAP.items())[:4]
+    pua_para = "".join(chr(int(cp)) for cp, _ in items)
+    decoded_para = "".join(ch for _, ch in items)
+    html = (
+        '<html><body><div class="muye-reader-content noselect">'
+        + "".join(f"<p>{pua_para}</p>" for _ in range(5))
+        + '</div><div class="footer">下载番茄 阅读全文 本章字数</div></body></html>'
+    )
+    soup = BeautifulSoup(html, "lxml")
+    out = FanqieParser().parse_content(soup)
+    assert out.count(decoded_para) == 5  # 标记存在但不误判为锁
+
+
 def test_parse_content_decodes_pua_paragraphs():
     items = list(FONT_MAP.items())[:5]
     pua_para = "".join(chr(int(cp)) for cp, _ in items)
     decoded_para = "".join(ch for _, ch in items)
-    # 3 段以上 + 无锁标记 → 正常解密
+    # 3 段以上 → 正常解密
     html = (
         '<html><body><div class="muye-reader-content noselect">'
         f"<p>{pua_para}</p><p>{pua_para}</p><p>{pua_para}</p>"
@@ -94,6 +111,17 @@ def test_fetch_book_list_parses_recommend_json():
     assert results[0].blurb == "简介A"
     assert results[0].word_count == "100"
     assert results[1].url.endswith("/page/2")
+
+
+def test_fetch_book_list_parses_data_list_key():
+    """recommend 端点实测返回 data.list（非 book_list）；离线验证兼容。"""
+    p = FanqieParser()
+    resp = {"data": {"list": [
+        {"bookId": "9", "bookName": "书X", "author": "作者", "abstract": "简介X"},
+    ]}}
+    results = p.get_category("female", lambda url, headers=None: json.dumps(resp))
+    assert [r.title for r in results] == ["书X"]
+    assert results[0].blurb == "简介X"
 
 
 def test_search_returns_empty():
