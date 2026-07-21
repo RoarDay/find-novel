@@ -246,14 +246,38 @@ def _cli_history(argv: list[str]) -> None:
             print(f"  [{ts}] {r['keyword']}  ({r['result_count']} 条)")
 
 
+def _cli_recommend(argv: list[str]) -> None:
+    p = argparse.ArgumentParser(
+        prog="novel-crawler recommend", description="协同推荐（读过 X 也读 Y）"
+    )
+    p.add_argument("url", help="书的目录页 URL（需已在某书单）")
+    p.add_argument("--limit", type=int, default=10)
+    ns = p.parse_args(argv)
+    rows = db.recommend_for(ns.url, ns.limit)
+    if not rows:
+        print("（无推荐：该书不在任何书单，或暂无共现）")
+        return
+    book = db.get_book(ns.url)
+    title = book["title"] if book else ns.url
+    print(f"读过《{title}》也读：")
+    for r in rows:
+        line = f"  - {r['title']}（{r['co']} 次共现）[{r['source']}]"
+        if r["author"]:
+            line += f" / {r['author']}"
+        print(line)
+
+
 def main():
-    # 子命令派发：booklist / history 不走原 positional url 流。
+    # 子命令派发：booklist / history / recommend 不走原 positional url 流。
     argv = sys.argv[1:]
     if argv and argv[0] == "booklist":
         _cli_booklist(argv[1:])
         return
     if argv and argv[0] == "history":
         _cli_history(argv[1:])
+        return
+    if argv and argv[0] == "recommend":
+        _cli_recommend(argv[1:])
         return
 
     args = parse_args()

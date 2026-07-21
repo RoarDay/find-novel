@@ -239,3 +239,23 @@ def get_snapshot(book_id: int) -> sqlite3.Row | None:
         return conn.execute(
             "SELECT * FROM book_snapshots WHERE book_id = ?", (book_id,)
         ).fetchone()
+
+
+# ── 协同推荐（书单共现）──────────────────────────────────────────────
+
+def recommend_for(url: str, limit: int = 10) -> list[sqlite3.Row]:
+    """「读过 X 也读 Y」：该书所在书单里的其它书，按共现次数降序。
+    该书不在任何书单 / url 不在 books 表 → []。每行含 books.* + co(共现次数)。"""
+    with _get_conn() as conn:
+        return conn.execute(
+            "SELECT b.*, COUNT(*) AS co "
+            "FROM booklist_items bi1 "
+            "JOIN booklist_items bi2 ON bi2.booklist_id = bi1.booklist_id "
+            "JOIN books b ON b.id = bi2.book_id "
+            "WHERE bi1.book_id = (SELECT id FROM books WHERE url = ?) "
+            "AND bi2.book_id != bi1.book_id "
+            "GROUP BY b.id "
+            "ORDER BY co DESC, b.title "
+            "LIMIT ?",
+            (url, limit),
+        ).fetchall()

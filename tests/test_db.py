@@ -139,3 +139,31 @@ def test_snapshot_cascades_on_book_delete(tmp_db):
     with tmp_db._get_conn() as conn:
         conn.execute("DELETE FROM books WHERE id = ?", (bid,))
     assert tmp_db.get_snapshot(bid) is None  # FK 级联
+
+
+# ── 协同推荐（书单共现）──────────────────────────────────────────────
+
+def test_recommend_ranked_by_cooccurrence(tmp_db):
+    for t, u in [("A", "uA"), ("B", "uB"), ("C", "uC"), ("D", "uD")]:
+        tmp_db.add_book(SearchResult(title=t, url=u, source="x.com"))
+    tmp_db.create_booklist("L1")
+    for u in ("uA", "uB", "uC"):
+        tmp_db.add_to_booklist("L1", u)
+    tmp_db.create_booklist("L2")
+    for u in ("uA", "uB"):
+        tmp_db.add_to_booklist("L2", u)
+    tmp_db.create_booklist("L3")
+    for u in ("uA", "uC"):
+        tmp_db.add_to_booklist("L3", u)
+
+    rec_a = tmp_db.recommend_for("uA")
+    assert {r["title"]: r["co"] for r in rec_a} == {"B": 2, "C": 2}  # D 不与 A 共现
+    rec_b = tmp_db.recommend_for("uB")
+    assert {r["title"]: r["co"] for r in rec_b} == {"A": 2, "C": 1}
+    assert [r["title"] for r in rec_b] == ["A", "C"]  # co 降序
+
+
+def test_recommend_empty_for_isolated_or_unknown(tmp_db):
+    tmp_db.add_book(SearchResult(title="D", url="uD", source="x.com"))
+    assert tmp_db.recommend_for("uD") == []   # 不在任何书单
+    assert tmp_db.recommend_for("unknown") == []  # url 不在 books
