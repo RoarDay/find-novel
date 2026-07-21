@@ -24,13 +24,23 @@
 
 ## 安装
 
+从 PyPI（推荐）：
+
 ```bash
-git clone <repo>
-cd mybook
-pip install -r requirements.txt
+pip install novel-crawler
+# 七猫全本下载（可选）：pip install 'novel-crawler[qimao]'
+```
+
+或从源码：
+
+```bash
+git clone https://github.com/RoarDay/find-novel.git
+cd find-novel
+pip install -r requirements.txt   # 或 pip install -e .
 ```
 
 依赖：`requests`、`beautifulsoup4`、`lxml`。Python ≥ 3.10。
+发版流程见 [RELEASING.md](RELEASING.md)。
 
 ## 用法
 
