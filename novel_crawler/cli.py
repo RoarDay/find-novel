@@ -118,6 +118,9 @@ def _cli_booklist(argv: list[str]) -> None:
     sp.add_argument("name")
     sp.add_argument("url")
 
+    sp = sub.add_parser("track", help="追更：抓目录比对快照，报告新增章节")
+    sp.add_argument("name")
+
     ns = p.parse_args(argv)
 
     if ns.cmd == "create":
@@ -158,6 +161,36 @@ def _cli_booklist(argv: list[str]) -> None:
             print(f"已从 '{ns.name}' 移除: {ns.url}")
         except ValueError as e:
             log.error("%s", e)
+
+    elif ns.cmd == "track":
+        _booklist_track(ns.name)
+
+
+def _booklist_track(name: str) -> None:
+    """追更：抓书单每本书目录，与上次快照比对，打印新增章节。"""
+    from novel_crawler.registry import ParserRegistry
+    from novel_crawler.tracker import track_booklist
+
+    engine = DownloadEngine(delay=DEFAULT_DELAY)
+    registry = ParserRegistry()
+    report = track_booklist(name, engine, registry)
+    if not report:
+        return
+    has_new = False
+    for e in report:
+        if e["status"] != "ok":
+            print(f"  - {e['title']} [{e['source']}]（{e['status']}）")
+            continue
+        new = e["new"]
+        marker = ""
+        if new and new > 0:
+            marker = f"  ⭐新增 {new} 章"
+            has_new = True
+        prev = e["prev_total"] if e["prev_total"] is not None else "?"
+        print(f"  - {e['title']} [{e['source']}] {prev}→{e['curr_total']} 章{marker}")
+        print(f"      最新: {e['last_chapter']}")
+    if not has_new:
+        print("（无新增章节）")
 
 
 def _booklist_add(name: str, url: str) -> None:

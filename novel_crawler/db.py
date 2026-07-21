@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS booklist_items (
     FOREIGN KEY (booklist_id) REFERENCES booklists(id) ON DELETE CASCADE,
     FOREIGN KEY (book_id)     REFERENCES books(id)     ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS book_snapshots (
+    book_id            INTEGER PRIMARY KEY,
+    chapter_total      INTEGER NOT NULL,
+    last_chapter_title TEXT,
+    checked_at         TEXT    NOT NULL,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
 """
 
 
@@ -209,3 +216,26 @@ def get_booklist_books(name: str) -> list[sqlite3.Row]:
             "WHERE bl.name = ? ORDER BY bi.added_at DESC",
             (name,),
         ).fetchall()
+
+
+# ── book_snapshots（追更）──────────────────────────────────────────────
+
+def upsert_snapshot(book_id: int, chapter_total: int, last_chapter_title: str) -> None:
+    """upsert 最新目录快照（按 book_id 单行）。"""
+    now = datetime.now().isoformat()
+    with _get_conn() as conn:
+        conn.execute(
+            "INSERT INTO book_snapshots(book_id, chapter_total, last_chapter_title, checked_at) "
+            "VALUES(?,?,?,?) "
+            "ON CONFLICT(book_id) DO UPDATE SET "
+            "chapter_total=excluded.chapter_total, "
+            "last_chapter_title=excluded.last_chapter_title, checked_at=excluded.checked_at",
+            (book_id, chapter_total, last_chapter_title, now),
+        )
+
+
+def get_snapshot(book_id: int) -> sqlite3.Row | None:
+    with _get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM book_snapshots WHERE book_id = ?", (book_id,)
+        ).fetchone()

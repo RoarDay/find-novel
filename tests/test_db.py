@@ -114,3 +114,28 @@ def test_list_booklists_ordered(tmp_db):
     tmp_db.create_booklist("b")
     names = [b["name"] for b in tmp_db.list_booklists()]
     assert names == ["b", "a"]  # DESC by created_at
+
+
+# ── book_snapshots（追更）──────────────────────────────────────────────
+
+def test_snapshot_upsert_and_get(tmp_db):
+    bid = tmp_db.add_book(_r(url="u1", title="书A"))
+    assert tmp_db.get_snapshot(bid) is None
+    tmp_db.upsert_snapshot(bid, 100, "第100章")
+    row = tmp_db.get_snapshot(bid)
+    assert row["chapter_total"] == 100
+    assert row["last_chapter_title"] == "第100章"
+    # re-upsert 更新
+    tmp_db.upsert_snapshot(bid, 130, "第130章")
+    row = tmp_db.get_snapshot(bid)
+    assert row["chapter_total"] == 130
+    assert row["last_chapter_title"] == "第130章"
+
+
+def test_snapshot_cascades_on_book_delete(tmp_db):
+    bid = tmp_db.add_book(_r(url="u1", title="书A"))
+    tmp_db.upsert_snapshot(bid, 50, "第50章")
+    assert tmp_db.get_snapshot(bid) is not None
+    with tmp_db._get_conn() as conn:
+        conn.execute("DELETE FROM books WHERE id = ?", (bid,))
+    assert tmp_db.get_snapshot(bid) is None  # FK 级联
