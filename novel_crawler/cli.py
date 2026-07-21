@@ -309,6 +309,15 @@ def _cli_diagnose(argv: list[str]) -> None:
     print(format_report(report))
 
 
+def _cli_web(argv: list[str]) -> None:
+    from novel_crawler.web import serve
+
+    p = argparse.ArgumentParser(prog="novel-crawler web", description="轻Web界面（浏览器看本地库）")
+    p.add_argument("--port", type=int, default=8000)
+    ns = p.parse_args(argv)
+    serve(ns.port)
+
+
 def main():
     # 子命令派发：booklist / history / recommend 不走原 positional url 流。
     argv = sys.argv[1:]
@@ -326,6 +335,9 @@ def main():
         return
     if argv and argv[0] == "diagnose":
         _cli_diagnose(argv[1:])
+        return
+    if argv and argv[0] == "web":
+        _cli_web(argv[1:])
         return
 
     args = parse_args()
