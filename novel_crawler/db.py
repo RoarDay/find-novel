@@ -118,6 +118,12 @@ def search_books(keyword: str) -> list[sqlite3.Row]:
         ).fetchall()
 
 
+def list_all_books() -> list[sqlite3.Row]:
+    """books 全表（去重/聚合用）。"""
+    with _get_conn() as conn:
+        return conn.execute("SELECT * FROM books ORDER BY created_at DESC").fetchall()
+
+
 # ── search_history ────────────────────────────────────────────────────
 
 def record_search(keyword: str, n: int) -> None:

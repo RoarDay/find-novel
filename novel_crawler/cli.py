@@ -267,6 +267,25 @@ def _cli_recommend(argv: list[str]) -> None:
         print(line)
 
 
+def _cli_dedup(argv: list[str]) -> None:
+    from novel_crawler.dedup import group_books
+
+    p = argparse.ArgumentParser(
+        prog="novel-crawler dedup", description="跨站去重 + 元数据聚合"
+    )
+    p.add_argument("--all", action="store_true", help="显示全部分组（默认仅多源重复）")
+    ns = p.parse_args(argv)
+    groups = group_books(db.list_all_books())
+    shown = groups if ns.all else [g for g in groups if len(g["sources"]) > 1]
+    if not shown:
+        print("（无跨站重复" + ("，--all 查看全部" if not ns.all else "）"))
+        return
+    for g in shown:
+        print(f"  《{g['title']}》/ {g['author']}  [{'+'.join(g['sources'])}]")
+        wc = g["word_count"] or "?"
+        print(f"      {wc}字  {len(g['sources'])} 源  {len(g['urls'])} 条记录")
+
+
 def main():
     # 子命令派发：booklist / history / recommend 不走原 positional url 流。
     argv = sys.argv[1:]
@@ -278,6 +297,9 @@ def main():
         return
     if argv and argv[0] == "recommend":
         _cli_recommend(argv[1:])
+        return
+    if argv and argv[0] == "dedup":
+        _cli_dedup(argv[1:])
         return
 
     args = parse_args()
