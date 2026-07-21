@@ -1,5 +1,7 @@
 from .base import BaseParser, SearchResult
-from .registry import ParserRegistry
 from .engine import DownloadEngine
+from .registry import ParserRegistry
 
-__all__ = ["BaseParser", "SearchResult", "ParserRegistry", "DownloadEngine"]
+__version__ = "0.2.0"
+
+__all__ = ["BaseParser", "SearchResult", "ParserRegistry", "DownloadEngine", "__version__"]

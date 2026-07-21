@@ -1,6 +1,8 @@
 import re
+from urllib.parse import quote, urljoin
+
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, quote
+
 from novel_crawler.base import BaseParser, SearchResult
 
 

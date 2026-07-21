@@ -1,6 +1,8 @@
 import re
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup
+
 from novel_crawler.base import BaseParser, SearchResult
 
 

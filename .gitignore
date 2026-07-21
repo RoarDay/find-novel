@@ -51,9 +51,17 @@ temp/
 
 
 *.pyc
+__pycache__/
+*.egg-info/
+build/
+dist/
 
 # Downloaded novels (本地下载产物，不入库)
 novels/
+
+# SQLite DB（书单 + 找书历史；本地状态不入库）
+*.db
+*.sqlite3
 
 
 # IDE specific files

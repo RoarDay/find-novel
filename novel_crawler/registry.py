@@ -1,18 +1,23 @@
 """解析器注册中心：根据 URL 自动匹配对应的站点解析器。"""
 
-import os
 import importlib
 import inspect
+import os
+from collections.abc import Callable
 from urllib.parse import urlparse
-from .base import BaseParser
+
+from .base import BaseParser, SearchResult
+from .log import get_logger
+
+log = get_logger("registry")
 
 
 class ParserRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         self._parsers: dict[str, BaseParser] = {}
         self._auto_register()
 
-    def _auto_register(self):
+    def _auto_register(self) -> None:
         """自动导入 sites 目录下所有模块，注册解析器实例。"""
         sites_dir = os.path.join(os.path.dirname(__file__), 'sites')
         if not os.path.isdir(sites_dir):
@@ -24,14 +29,14 @@ class ParserRegistry:
             module_name = f"novel_crawler.sites.{filename[:-3]}"
             try:
                 module = importlib.import_module(module_name)
-                for name, obj in inspect.getmembers(module, inspect.isclass):
+                for _name, obj in inspect.getmembers(module, inspect.isclass):
                     if issubclass(obj, BaseParser) and obj is not BaseParser:
                         instance = obj()
                         self.register(instance)
             except Exception as e:
-                print(f"[Registry] 加载 {module_name} 失败: {e}")
+                log.warning("加载 %s 失败: %s", module_name, e)
 
-    def register(self, parser: BaseParser):
+    def register(self, parser: BaseParser) -> None:
         self._parsers[parser.domain] = parser
 
     def get_parser(self, url: str) -> BaseParser:
@@ -44,19 +49,21 @@ class ParserRegistry:
     def list_supported(self) -> list[str]:
         return list(self._parsers.keys())
 
-    def get_by_source(self, domain: str):
+    def get_by_source(self, domain: str) -> BaseParser:
         """按域名取 parser 实例（支持子域）。"""
         for key, parser in self._parsers.items():
             if domain == key or domain.endswith("." + key):
                 return parser
         raise ValueError(f"未找到该域名解析器: {domain}")
 
-    def search_all(self, keyword: str, fetch) -> list:
+    def search_all(
+        self, keyword: str, fetch: Callable[..., str | None]
+    ) -> list[SearchResult]:
         """聚合搜索所有已注册站点，单站失败不影响其它。"""
-        all_results = []
+        all_results: list[SearchResult] = []
         for parser in self._parsers.values():
             try:
                 all_results.extend(parser.search(keyword, fetch))
             except Exception as e:
-                print(f"[搜索] {parser.domain} 失败: {e}")
+                log.warning("%s 搜索失败: %s", parser.domain, e)
         return all_results

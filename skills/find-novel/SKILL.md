@@ -31,15 +31,15 @@ description: "自然语言找小说推荐。用户想找小说、描述阅读喜
 - 合并候选，按 url 去重。
 - 缺 blurb 的（七猫/飞卢 category 候选）：`python main.py --blurb <url1> <url2> ...`（限 top-K，K≈10）。
 
-### ⑤【模型】语义排序 → top-5
-- 读候选 blurb + word_count + 用户描述 + 画像，**语义匹配**粗排。
-- 对粗排 top 候选（≈5-8 本），调 `python main.py --chapters <url1> <url2> ... --top 50` 取前 50 章标题，**读章节名推断实际情节/节奏/风格**（比简介更准——章节名暴露真实走向），精排定 top-5。
-- 每条「为什么推荐」结合：简介 + 章节名反映的情节走向 + 字数量级 + 画像偏好。
-- 字数参考：短篇 <30 万、中篇 30-100 万、长篇 100-300 万、超长 >300 万；结合用户偏好（如要爽快节奏→短中篇更紧凑）。
+### ⑤【模型】语义排序 → top-20
+- 读候选 blurb + word_count + 用户描述 + 画像，**语义匹配**粗排（结合画像：长篇/题材/雷点过滤）。
+- 对粗排前列（≈8 本）调 `python main.py --chapters <url1> ... --top 50` 取前 50 章标题，读章节名精排定序；最终展示 **top-20**（前 8 章节精排，其余简介+字数粗排）。
+- 每条「为什么推荐」结合：简介 + 章节名反映的走向（前 8）+ 字数量级 + 画像偏好。
+- 字数参考：短篇 <30 万、中篇 30-100 万、长篇 100-300 万、超长 >300 万。
 
 ### ⑥ 输出 + 反馈 + 下载
 ```
-根据「<用户描述>」+ 你的偏好（<画像摘要>），推荐 top 5：
+根据「<用户描述>」+ 你的偏好（<画像摘要>），推荐 top 20：
 
 1. 《书名》[来源站](<字数，如 37.27万字>) — <简介一句话>
    为什么推荐：<匹配点，如：法师主角+爽文节奏+非虐主>
@@ -48,6 +48,7 @@ description: "自然语言找小说推荐。用户想找小说、描述阅读喜
 ```
 - 反馈（喜欢/不喜欢/雷点）→ **更新画像 memory**（`novel-preferences.md`）：累积偏好，去重，雷点 ❌ 标注。
 - 选号下载 → `python main.py <url>`（存 `novels/`）。
+- 收藏/书单 → `novel-crawler booklist add <书单名> <url>`（先 `booklist create <名>` 建书单）；`novel-crawler booklist list [--name <名>]` 看书单；`novel-crawler history list` 看找书历史。
 
 ## 画像 memory 规则
 - 文件：`/Users/xinchao/.claude/projects/-Users-xinchao-work-mybook/memory/novel-preferences.md`（user 类）。

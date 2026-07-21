@@ -6,8 +6,10 @@ search 首期不做（社区教程零覆盖；分类/排行更划算），实现
 """
 
 import re
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup
+
 from novel_crawler.base import BaseParser, SearchResult
 
 # 详情页/目录页同页：https://b.faloo.com/{bookId}.html
@@ -24,7 +26,8 @@ class FalooParser(BaseParser):
         return "faloo.com"
 
     def parse_catalog(self, soup: BeautifulSoup, base_url: str) -> list:
-        # ponytail: #mulu 容器实测含全部章节链接（2222/476534），不需走 c_con_li_detail_p（research 给的 selector 实测未命中）
+        # ponytail: #mulu 实测含全部章节链接（2222/476534）；
+        # 不走 c_con_li_detail_p（research selector 实测未命中）
         mulu = soup.select_one("#mulu")
         if not mulu:
             return []

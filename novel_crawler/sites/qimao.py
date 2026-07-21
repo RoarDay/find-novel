@@ -1,7 +1,9 @@
-import re
 import json
-from bs4 import BeautifulSoup
+import re
 from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup
+
 from novel_crawler.base import BaseParser, SearchResult
 
 
@@ -87,7 +89,10 @@ class QimaoParser(BaseParser):
         rank_type = (rank_type or "boy/hot/date").strip()
         parts = re.split(r"[-/]", rank_type)
         if len(parts) != 3:
-            print(f"[qimao] 无法识别 rank_type {rank_type!r}，需 'gender-type-when'（如 boy-hot-date）")
+            print(
+                f"[qimao] 无法识别 rank_type {rank_type!r}，"
+                "需 'gender-type-when'（如 boy-hot-date）"
+            )
             return []
         gender, rtype, when = parts
         url = f"{self.BASE}/paihang/{gender}/{rtype}/{when}/"
@@ -140,14 +145,17 @@ class QimaoParser(BaseParser):
                 url=url_s,
                 source=self.domain,
                 author=author_s,
-                blurb="",  # ponytail: recommendBook.short_comment 是 NUXT 变量引用，无法裸解析；需简介另发详情页请求
+                # ponytail: recommendBook.short_comment 是 NUXT 变量引用，
+            # 无法裸解析；需简介另发详情页请求
+            blurb="",
             ))
         return results
 
     # ----- 目录 + 正文（下载流程用） -----
 
     def parse_catalog(self, soup: BeautifulSoup, base_url: str) -> list:
-        """详情页只露最新一章 `/shuku/{book}-{chapter}/`；完整目录需走 App API（需签名，本场景不实现）。"""
+        """详情页只露最新一章 `/shuku/{book}-{chapter}/`；
+        完整目录需走 App API（需签名，本场景不实现）。"""
         chapters = []
         for a in soup.select('a[href*="/shuku/"]'):
             href = a.get("href", "")

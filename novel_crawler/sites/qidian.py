@@ -17,7 +17,8 @@ def _extract_page_context(html: str) -> dict:
     if not m:
         return {}
     try:
-        return json.loads(m.group(1)).get("pageContext", {}).get("pageProps", {}).get("pageData", {})
+        data = json.loads(m.group(1))
+        return data.get("pageContext", {}).get("pageProps", {}).get("pageData", {})
     except (ValueError, KeyError):
         return {}
 

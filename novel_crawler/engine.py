@@ -1,23 +1,26 @@
 """下载引擎：HTTP 请求、重试、并发调度、顺序写入。"""
 
-import time
-import random
 import concurrent.futures
+import random
 import threading
-from typing import Callable
+import time
+from collections.abc import Callable
+
 import requests
+
+from novel_crawler.config import DEFAULT_DELAY, DEFAULT_UA
 
 
 class DownloadEngine:
     def __init__(
         self,
         max_workers: int = 5,
-        delay: tuple[float, float] = (0.1, 0.3),
+        delay: tuple[float, float] = DEFAULT_DELAY,
     ):
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                "User-Agent": DEFAULT_UA,
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             }
         )
@@ -25,8 +28,18 @@ class DownloadEngine:
         self.delay = delay
         self.lock = threading.Lock()
 
-    def fetch(self, url: str, retries: int = 3, method: str = "GET", data: dict | None = None, headers: dict | None = None) -> str | None:
-        """带指数退避的请求。method/data 支持 POST；headers 支持 per-parser 覆盖（如起点 iPhone UA）。"""
+    def fetch(
+        self,
+        url: str,
+        retries: int = 3,
+        method: str = "GET",
+        data: dict | None = None,
+        headers: dict | None = None,
+    ) -> str | None:
+        """带指数退避的请求。
+
+        method/data 支持 POST；headers 支持 per-parser 覆盖（如起点 iPhone UA）。
+        """
         for i in range(retries):
             try:
                 time.sleep(random.uniform(*self.delay))
@@ -71,11 +84,12 @@ class DownloadEngine:
         chapters: list[tuple[str, str]],
         parse_fn: Callable[[str], str | None],
         on_progress: Callable[[int, int], None] | None = None,
-    ) -> dict[int, tuple[str, str | None]]:
+    ) -> tuple[dict[int, tuple[str, str | None]], list[tuple[int, str, str]]]:
         """
-        并发下载所有章节，返回按索引有序的结果字典。
+        并发下载所有章节，返回 (results, failed)。
         chapters: [(标题, URL), ...]
         parse_fn: 接收章节URL，返回正文或 None。
+        results: {idx: (title, content|None)}；failed: [(idx, title, url)]。
         """
         results: dict[int, tuple[str, str | None]] = {}
         failed: list[tuple[int, str, str]] = []
@@ -130,7 +144,8 @@ class DownloadEngine:
         output_dir: str | None = None,
     ) -> str:
         """按顺序写入 TXT 文件。output_dir 指定时写入子目录（自动创建）。"""
-        import re, os
+        import os
+        import re
 
         if filename is None:
             filename = f"{novel_name}.txt"

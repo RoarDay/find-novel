@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "novel-crawler"
+dynamic = ["version"]
+description = "多站小说爬虫 + 自然语言找书（Claude 推荐 skill）"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.28",
+    "beautifulsoup4>=4.11",
+    "lxml>=4.9",
+]
+readme = "README.md"
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4", "mypy>=1.10"]
+
+[project.scripts]
+novel-crawler = "novel_crawler.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["novel_crawler*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "novel_crawler.__version__"}
+
+[tool.ruff]
+line-length = 100
+exclude = ["novels", ".trellis", ".claude", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+exclude = ["novels/"]
+
+# ponytail: sites/ 解析器对 bs4 多值属性宽松，core 清就够了
+[[tool.mypy.overrides]]
+module = "novel_crawler.sites.*"
+ignore_errors = true

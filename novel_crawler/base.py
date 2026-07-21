@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup
 
 
 @dataclass
@@ -55,8 +56,13 @@ class BaseParser(ABC):
         next_link = soup.select_one('a#next_url') or soup.select_one("a[rel='next']")
         if not next_link:
             return None
-        next_href = next_link.get('href', '')
-        next_href = urljoin(current_url, next_href)
+        # bs4 多值属性返回 list，href 理论只单值但 stubs 收紧了，统一取首项
+        href = next_link.get('href', '')
+        if isinstance(href, list):
+            href = href[0] if href else ''
+        if not href:
+            return None
+        next_href = urljoin(current_url, str(href))
         if re.search(r'_\d+\.html$', next_href):
             return next_href
         return None

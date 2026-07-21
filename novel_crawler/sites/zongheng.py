@@ -1,7 +1,9 @@
 import json
 import re
 from urllib.parse import quote, urljoin
+
 from bs4 import BeautifulSoup
+
 from novel_crawler.base import BaseParser, SearchResult
 
 
@@ -54,6 +56,7 @@ class ZonghengParser(BaseParser):
         if not content:
             return ""
         text = content.get_text(separator="\n", strip=True)
-        # ponytail: 章节页 title 拼了 `_书名小说最新章节,在线阅读,纵横小说` 后缀，body 偶发渗入，按需剥掉
+        # ponytail: title 拼了 `_书名小说最新章节,在线阅读,纵横小说` 后缀，
+        # body 偶发渗入，按需剥掉
         text = re.sub(r"_.*?纵横小说", "", text)
         return text.strip()
