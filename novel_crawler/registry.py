@@ -44,6 +44,13 @@ class ParserRegistry:
     def list_supported(self) -> list[str]:
         return list(self._parsers.keys())
 
+    def get_by_source(self, domain: str):
+        """按域名取 parser 实例（支持子域）。"""
+        for key, parser in self._parsers.items():
+            if domain == key or domain.endswith("." + key):
+                return parser
+        raise ValueError(f"未找到该域名解析器: {domain}")
+
     def search_all(self, keyword: str, fetch) -> list:
         """聚合搜索所有已注册站点，单站失败不影响其它。"""
         all_results = []

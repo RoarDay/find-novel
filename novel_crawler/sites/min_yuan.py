@@ -51,7 +51,7 @@ class MinYuanParser(BaseParser):
     def search(self, keyword: str, fetch) -> list:
         """POST /search/ 搜索。"""
         url = "https://www.min-yuan.com/search/"
-        html = fetch(url, method="POST", data={"searchkey": keyword})
+        html = fetch(url, method="POST", data={"searchkey": keyword}, headers=self.headers)
         if not html:
             return []
         soup = BeautifulSoup(html, "lxml")

@@ -10,10 +10,13 @@ class SearchResult:
     url: str         # 目录页绝对 URL（直接喂给下载流程）
     source: str      # 来源站域名，用于聚合显示
     author: str = "" # 可选，作者
+    blurb: str = ""  # 简介，语义匹配主依据
 
 
 class BaseParser(ABC):
     """站点解析器基类。新增站点只需继承此类，实现3个方法。"""
+
+    headers: dict = {}  # 子类可覆盖，如起点 iPhone UA
 
     @property
     @abstractmethod
@@ -63,4 +66,20 @@ class BaseParser(ABC):
         fetch: callable(url, method="GET", data=None) -> html str | None
         返回: [SearchResult, ...]。默认返回空（站点未实现搜索）。
         """
+        return []
+
+    def get_blurb(self, url: str, fetch) -> str:
+        """详情页简介。默认空（搜索已带简介的站不需实现）。"""
+        return ""
+
+    def get_rank(self, rank_type: str, fetch) -> list:
+        """排行榜。默认空。"""
+        return []
+
+    def get_category(self, category: str, fetch) -> list:
+        """分类/标签筛选。默认空。"""
+        return []
+
+    def get_similar(self, url: str, fetch) -> list:
+        """相似推荐。默认空。"""
         return []

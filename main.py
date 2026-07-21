@@ -3,8 +3,12 @@
 极简多站小说爬虫 —— 入口脚本
 
 用法：
-    python main.py <目录页URL> [选项]            # 直接下载
-    python main.py --search <书名> [选项]        # 聚合搜索后交互式选书
+    python main.py <目录页URL> [选项]                       # 直接下载
+    python main.py --search <书名> [选项]                   # 聚合搜索后交互式选书
+    python main.py --search <词> --json                     # 非交互 JSON（给 Claude 调）
+    python main.py --blurb <url> [<url>...]                 # 批量取简介 JSON
+    python main.py --category <cat> --source <域名> --json  # 单站分类 JSON
+    python main.py --rank <type> --source <域名> --json     # 单站排行 JSON
 
 示例：
     python main.py https://www.92yanqing.com/read/36979/
@@ -12,6 +16,7 @@
 """
 
 import argparse
+import json
 import sys
 import time
 from bs4 import BeautifulSoup
@@ -30,7 +35,22 @@ def parse_args():
     parser.add_argument("--start", type=int, default=1, help="起始章节索引，从1开始 (默认: 1)")
     parser.add_argument("--end", type=int, default=None, help="结束章节索引 (默认: 全部)")
     parser.add_argument("--output", type=str, default=None, help="自定义输出文件名")
+    # 非交互 JSON 出口（给 Claude 调用）
+    parser.add_argument("--json", action="store_true", help="非交互 JSON 输出（配合 --search/--category/--rank）")
+    parser.add_argument("--blurb", nargs="+", default=None, help="批量取详情页简介，输出 {url: blurb} JSON")
+    parser.add_argument("--category", type=str, default=None, help="分类/标签筛选（需 --source 指定站）")
+    parser.add_argument("--rank", type=str, default=None, help="排行榜类型（需 --source 指定站）")
+    parser.add_argument("--source", type=str, default=None, help="指定站点域名（配合 --category/--rank）")
     return parser.parse_args()
+
+
+def _r_dict(r):
+    """SearchResult → dict（JSON 输出）。"""
+    return {"title": r.title, "url": r.url, "source": r.source, "author": r.author, "blurb": r.blurb}
+
+
+def _json_dump(obj):
+    print(json.dumps(obj, ensure_ascii=False))
 
 
 def search_and_pick(keyword, engine, registry):
@@ -67,7 +87,7 @@ def download(catalog_url, args, engine):
 
     # 1. 获取目录
     print("[1/3] 获取目录...")
-    catalog_html = engine.fetch(catalog_url)
+    catalog_html = engine.fetch(catalog_url, headers=parser.headers)
     if not catalog_html:
         print("[错误] 目录页获取失败")
         sys.exit(1)
@@ -129,20 +149,48 @@ def download(catalog_url, args, engine):
 
 def main():
     args = parse_args()
+    engine = DownloadEngine(
+        max_workers=args.workers,
+        delay=(args.delay_min, args.delay_max),
+    )
+    registry = ParserRegistry()
 
+    # 非交互 JSON 出口（给 Claude 调用）
+    if args.blurb:
+        out = {}
+        for u in args.blurb:
+            try:
+                out[u] = registry.get_parser(u).get_blurb(u, engine.fetch)
+            except Exception:
+                out[u] = ""
+        _json_dump(out)
+        return
+    if args.json and args.search:
+        _json_dump([_r_dict(r) for r in registry.search_all(args.search, engine.fetch)])
+        return
+    if args.json and args.category and args.source:
+        try:
+            p = registry.get_by_source(args.source)
+            _json_dump([_r_dict(r) for r in p.get_category(args.category, engine.fetch)])
+        except Exception as e:
+            _json_dump({"error": str(e)})
+        return
+    if args.json and args.rank and args.source:
+        try:
+            p = registry.get_by_source(args.source)
+            _json_dump([_r_dict(r) for r in p.get_rank(args.rank, engine.fetch)])
+        except Exception as e:
+            _json_dump({"error": str(e)})
+        return
+
+    # 原有交互/下载
     if not args.url and not args.search:
         print("[错误] 必须提供目录页 URL 或 --search 关键词")
         print("  用法: python main.py <URL>  或  python main.py --search <书名>")
         sys.exit(1)
 
-    engine = DownloadEngine(
-        max_workers=args.workers,
-        delay=(args.delay_min, args.delay_max),
-    )
-
     catalog_url = args.url
     if args.search:
-        registry = ParserRegistry()
         catalog_url = search_and_pick(args.search, engine, registry)
         if not catalog_url:
             return

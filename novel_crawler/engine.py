@@ -25,16 +25,16 @@ class DownloadEngine:
         self.delay = delay
         self.lock = threading.Lock()
 
-    def fetch(self, url: str, retries: int = 3, method: str = "GET", data: dict | None = None) -> str | None:
-        """带指数退避的请求。method/data 支持 POST（搜索用）。"""
+    def fetch(self, url: str, retries: int = 3, method: str = "GET", data: dict | None = None, headers: dict | None = None) -> str | None:
+        """带指数退避的请求。method/data 支持 POST；headers 支持 per-parser 覆盖（如起点 iPhone UA）。"""
         for i in range(retries):
             try:
                 time.sleep(random.uniform(*self.delay))
                 if method == "POST":
-                    resp = self.session.post(url, data=data, timeout=15)
+                    resp = self.session.post(url, data=data, headers=headers, timeout=15)
                 else:
-                    resp = self.session.get(url, timeout=15)
-                resp.encoding = resp.encoding or resp.apparent_encoding or "utf-8"
+                    resp = self.session.get(url, headers=headers, timeout=15)
+                resp.encoding = resp.apparent_encoding or resp.encoding or "utf-8"
                 if resp.status_code == 200:
                     return resp.text
             except Exception:
@@ -51,7 +51,7 @@ class DownloadEngine:
 
         while current_url and page_count < max_pages:
             page_count += 1
-            html = self.fetch(current_url)
+            html = self.fetch(current_url, headers=parser.headers)
             if not html:
                 break
             soup = BeautifulSoup(html, "lxml")
