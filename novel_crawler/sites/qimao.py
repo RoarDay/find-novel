@@ -172,6 +172,26 @@ class QimaoParser(BaseParser):
         text = "\n".join(ln for ln in lines if len(ln) >= 20)
         return re.sub(r"\n{3,}", "\n\n", text).strip()
 
+    # ----- 完整目录 / 全本下载（App API，委托 _qimao_appapi）-----
+
+    @staticmethod
+    def book_id_from_url(url: str) -> str:
+        """`/shuku/{book_id}/` → book_id。App API 用此 id（与 web 章节 id 不互通）。"""
+        m = re.search(r"/shuku/(\d+)", url)
+        return m.group(1) if m else ""
+
+    def get_full_catalog(self, book_id, fetch=None) -> list:
+        """App API chapter-list → 完整目录 [(title, chapter_id)]。核心功能，零新依赖。"""
+        from ._qimao_appapi import get_full_catalog as _get
+
+        return _get(book_id, fetch)
+
+    def download_full_content(self, book_id, fetch=None, bytes_fetcher=None) -> dict:
+        """App API download zip + AES → {chapter_id: 正文}。需 pycryptodome（懒加载）。"""
+        from ._qimao_appapi import download_full_content as _dl
+
+        return _dl(book_id, fetch, bytes_fetcher)
+
 
 if __name__ == "__main__":
     # ponytail: 真连网烟测；断网/改版时跳过

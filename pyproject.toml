@@ -16,6 +16,8 @@ readme = "README.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "ruff>=0.4", "mypy>=1.10"]
+# 全本下载（七猫 App API zip + AES 解密）才需要；核心功能零新依赖
+qimao = ["pycryptodome>=3.20"]
 
 [project.scripts]
 novel-crawler = "novel_crawler.cli:main"

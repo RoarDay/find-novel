@@ -68,6 +68,10 @@ def parse_args():
         "--top", type=int, default=50,
         help="--chapters 取的章节数（默认 50）",
     )
+    parser.add_argument(
+        "--full", action="store_true",
+        help="七猫走 App API 完整目录 + 全本下载（zip+AES，需 pycryptodome）",
+    )
     return parser.parse_args()
 
 
