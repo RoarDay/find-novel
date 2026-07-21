@@ -286,6 +286,29 @@ def _cli_dedup(argv: list[str]) -> None:
         print(f"      {wc}字  {len(g['sources'])} 源  {len(g['urls'])} 条记录")
 
 
+def _cli_diagnose(argv: list[str]) -> None:
+    from novel_crawler.diagnose import format_report, health_check
+
+    p = argparse.ArgumentParser(
+        prog="novel-crawler diagnose",
+        description="站点 selector 健康检查（失效检测，定位改版）",
+    )
+    p.add_argument(
+        "--sample", action="append", default=[], metavar="DOMAIN=URL",
+        help="覆盖/补充某 domain 的样本 URL（可多次）",
+    )
+    ns = p.parse_args(argv)
+    samples = {}
+    for item in ns.sample:
+        if "=" in item:
+            k, v = item.split("=", 1)
+            samples[k.strip()] = v.strip()
+    engine = DownloadEngine(delay=DEFAULT_DELAY)
+    registry = ParserRegistry()
+    report = health_check(registry, engine.cached_fetch, samples)
+    print(format_report(report))
+
+
 def main():
     # 子命令派发：booklist / history / recommend 不走原 positional url 流。
     argv = sys.argv[1:]
@@ -300,6 +323,9 @@ def main():
         return
     if argv and argv[0] == "dedup":
         _cli_dedup(argv[1:])
+        return
+    if argv and argv[0] == "diagnose":
+        _cli_diagnose(argv[1:])
         return
 
     args = parse_args()

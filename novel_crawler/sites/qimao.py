@@ -15,6 +15,7 @@ class QimaoParser(BaseParser):
     """
 
     BASE = "https://www.qimao.com"
+    sample_url = f"{BASE}/shuku/1860026/"  # 七猫样本（sign.md / __main__）
 
     @property
     def domain(self) -> str:

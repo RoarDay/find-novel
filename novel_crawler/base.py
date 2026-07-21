@@ -19,6 +19,7 @@ class BaseParser(ABC):
     """站点解析器基类。新增站点只需继承此类，实现3个方法。"""
 
     headers: dict = {}  # 子类可覆盖，如起点 iPhone UA
+    sample_url: str | None = None  # 稳定样本 URL，供 diagnose 健康检查（可选）
 
     @property
     @abstractmethod

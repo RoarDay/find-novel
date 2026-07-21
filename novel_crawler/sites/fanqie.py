@@ -134,6 +134,7 @@ class FanqieParser(BaseParser):
     """番茄小说解析器。目录从书页内联 JSON 抽；正文 PUA 解密。"""
 
     headers = HEADERS
+    sample_url = f"{BASE}/page/7143038691944959011"  # 十日终焉（probe.md 样本）
 
     @property
     def domain(self) -> str:
