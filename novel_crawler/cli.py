@@ -72,6 +72,10 @@ def parse_args():
         "--full", action="store_true",
         help="七猫走 App API 完整目录 + 全本下载（zip+AES，需 pycryptodome）",
     )
+    parser.add_argument(
+        "--preview", type=int, default=None, metavar="N",
+        help="取前 N 章正文（试读文笔），配合 positional <url>，JSON 输出",
+    )
     return parser.parse_args()
 
 
@@ -267,6 +271,14 @@ def main():
         try:
             p = registry.get_by_source(args.source)
             _json_dump([_r_dict(r) for r in p.get_rank(args.rank, engine.cached_fetch)])
+        except Exception as e:
+            _json_dump({"error": str(e)})
+        return
+    if args.preview is not None and args.url:
+        from novel_crawler.preview import preview
+
+        try:
+            _json_dump(preview(args.url, args.preview, engine, registry))
         except Exception as e:
             _json_dump({"error": str(e)})
         return
