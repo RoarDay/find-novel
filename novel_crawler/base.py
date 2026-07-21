@@ -11,6 +11,7 @@ class SearchResult:
     source: str      # 来源站域名，用于聚合显示
     author: str = "" # 可选，作者
     blurb: str = ""  # 简介，语义匹配主依据
+    word_count: str = ""  # 字数（站点原样字符串，如 "767.59万字" / "2089021"）
 
 
 class BaseParser(ABC):
@@ -83,3 +84,12 @@ class BaseParser(ABC):
     def get_similar(self, url: str, fetch) -> list:
         """相似推荐。默认空。"""
         return []
+
+    def get_chapter_titles(self, url: str, fetch, limit: int = 50) -> list:
+        """目录页前 N 章标题（供 Claude 推断内容/风格）。默认复用 parse_catalog。"""
+        html = fetch(url, headers=self.headers)
+        if not html:
+            return []
+        soup = BeautifulSoup(html, "lxml")
+        chapters = self.parse_catalog(soup, url)
+        return [t for t, _ in chapters[:limit]]

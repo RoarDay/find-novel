@@ -41,12 +41,14 @@ def parse_args():
     parser.add_argument("--category", type=str, default=None, help="分类/标签筛选（需 --source 指定站）")
     parser.add_argument("--rank", type=str, default=None, help="排行榜类型（需 --source 指定站）")
     parser.add_argument("--source", type=str, default=None, help="指定站点域名（配合 --category/--rank）")
+    parser.add_argument("--chapters", nargs="+", default=None, help="取目录页前 N 章标题 JSON {url: [title...]}（配合 --top）")
+    parser.add_argument("--top", type=int, default=50, help="--chapters 取的章节数（默认 50）")
     return parser.parse_args()
 
 
 def _r_dict(r):
     """SearchResult → dict（JSON 输出）。"""
-    return {"title": r.title, "url": r.url, "source": r.source, "author": r.author, "blurb": r.blurb}
+    return {"title": r.title, "url": r.url, "source": r.source, "author": r.author, "blurb": r.blurb, "word_count": r.word_count}
 
 
 def _json_dump(obj):
@@ -163,6 +165,15 @@ def main():
                 out[u] = registry.get_parser(u).get_blurb(u, engine.fetch)
             except Exception:
                 out[u] = ""
+        _json_dump(out)
+        return
+    if args.chapters:
+        out = {}
+        for u in args.chapters:
+            try:
+                out[u] = registry.get_parser(u).get_chapter_titles(u, engine.fetch, args.top)
+            except Exception:
+                out[u] = []
         _json_dump(out)
         return
     if args.json and args.search:

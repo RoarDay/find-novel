@@ -52,11 +52,15 @@ class Yanqing92Parser(BaseParser):
                 continue
             dds = dl.select("dd")
             author_a = dl.select_one('dd a[href^="/author/"]')
+            # ponytail: dd[1] 的 span 序列是 [状态, 字数]，取末个即字数（如 "11万字"）
+            meta_spans = dds[1].find_all("span") if len(dds) > 1 else []
+            word_count = meta_spans[-1].get_text(strip=True) if meta_spans else ""
             results.append(SearchResult(
                 title=a.get_text(strip=True),
                 url=urljoin("https://www.92yanqing.com/", a["href"]),
                 source=self.domain,
                 author=author_a.get_text(strip=True) if author_a else "",
                 blurb=dds[0].get_text(strip=True) if dds else "",
+                word_count=word_count,
             ))
         return results

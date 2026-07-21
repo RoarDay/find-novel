@@ -87,11 +87,27 @@ class FalooParser(BaseParser):
         return self._extract_book_list(url, fetch)
 
     def _extract_book_list(self, url: str, fetch) -> list:
-        """从分类/排行页提取去重的书候选。blurb 留空（详情页按需补）。"""
+        """从分类/排行页提取去重的书候选。blurb 留空（详情页按需补）。
+        分类页 .TwoBox02_02 卡片含「字数：N万」，填 word_count；
+        排行页无卡片容器（裸 <a>），word_count 留空。"""
         html = fetch(url, headers=self.headers)
         if not html:
             return []
         soup = BeautifulSoup(html, "lxml")
+        # ponytail: 字数只在分类页 .TwoBox02_02 卡片里；排行页是裸 <a>，无字数
+        word_by_bid = {}
+        for card in soup.select(".TwoBox02_02"):
+            bid = None
+            for a in card.find_all("a", href=_BOOKID_RE):
+                bid = _BOOKID_RE.search(a["href"]).group(1)
+                break
+            if not bid:
+                continue
+            for span in card.select(".TwoBox02_05"):
+                m_wc = re.search(r"字数[：:]\s*(\S+)", span.get_text(" ", strip=True))
+                if m_wc:
+                    word_by_bid[bid] = m_wc.group(1)
+                    break
         results = []
         seen_bid = set()
         for a in soup.find_all("a", href=_BOOKID_RE):
@@ -104,5 +120,6 @@ class FalooParser(BaseParser):
                 title=title,
                 url=f"https://b.faloo.com/{bid}.html",
                 source=self.domain,
+                word_count=word_by_bid.get(bid, ""),
             ))
         return results

@@ -50,6 +50,7 @@ class QidianParser(BaseParser):
                 source=self.domain,
                 author=r.get("bAuth", ""),
                 blurb=r.get("desc", ""),
+                word_count=r.get("cnt", ""),
             ))
         return results
 

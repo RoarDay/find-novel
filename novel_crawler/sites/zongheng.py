@@ -30,12 +30,14 @@ class ZonghengParser(BaseParser):
                 continue
             name = re.sub(r"<[^>]+>", "", it.get("name", ""))
             desc = re.sub(r"<[^>]+>", "", it.get("description", ""))
+            total_word = it.get("totalWord")
             results.append(SearchResult(
                 title=name,
                 url=f"https://book.zongheng.com/showchapter/{book_id}.html",
                 source=self.domain,
                 author=it.get("authorName", ""),
                 blurb=desc,
+                word_count=str(total_word) if total_word else "",
             ))
         return results
 

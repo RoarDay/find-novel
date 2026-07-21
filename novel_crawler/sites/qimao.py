@@ -55,12 +55,14 @@ class QimaoParser(BaseParser):
                 continue
             desc = card.select_one(".s-desc")
             author_a = card.select_one("a.s-author") or card.select_one('a[href*="/zuozhe/"]')
+            word_em = card.select_one(".s-words-num")
             results.append(SearchResult(
                 title=a.get_text(strip=True),
                 url=urljoin(self.BASE + "/", a["href"]),
                 source=self.domain,
                 author=author_a.get_text(strip=True) if author_a else "",
                 blurb=desc.get_text(" ", strip=True) if desc else "",
+                word_count=word_em.get_text(strip=True) if word_em else "",
             ))
         return results
 
