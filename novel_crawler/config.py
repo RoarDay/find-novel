@@ -5,3 +5,4 @@ DEFAULT_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
 DEFAULT_DELAY = (0.1, 0.3)  # (min, max) 秒
 DB_PATH = "novels/novel-crawler.db"  # SQLite：books/search_history/booklists
 enable_history: bool = True  # --search 是否记录找书历史 + 入 books 表
+CACHE_TTL = 3600  # 请求缓存存活秒数（搜索/详情页等元数据；下载流程不缓存）

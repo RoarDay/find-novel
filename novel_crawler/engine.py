@@ -35,11 +35,22 @@ class DownloadEngine:
         method: str = "GET",
         data: dict | None = None,
         headers: dict | None = None,
+        cache: bool = False,
+        cache_ttl: int | None = None,
     ) -> str | None:
         """带指数退避的请求。
 
         method/data 支持 POST；headers 支持 per-parser 覆盖（如起点 iPhone UA）。
+        cache=True 时走短期缓存（搜索/详情页等元数据；下载流程不要开）。
         """
+        if cache:
+            from novel_crawler import cache as cache_mod
+            from novel_crawler import config
+
+            key = cache_mod.make_key(method, url, data, headers)
+            hit = cache_mod.get(key, cache_ttl if cache_ttl is not None else config.CACHE_TTL)
+            if hit is not None:
+                return hit
         for i in range(retries):
             try:
                 time.sleep(random.uniform(*self.delay))
@@ -49,10 +60,25 @@ class DownloadEngine:
                     resp = self.session.get(url, headers=headers, timeout=15)
                 resp.encoding = resp.apparent_encoding or resp.encoding or "utf-8"
                 if resp.status_code == 200:
+                    if cache:
+                        cache_mod.set(key, resp.text)
                     return resp.text
             except Exception:
                 time.sleep(0.5 * (i + 1))
         return None
+
+    def cached_fetch(
+        self,
+        url: str,
+        retries: int = 3,
+        method: str = "GET",
+        data: dict | None = None,
+        headers: dict | None = None,
+    ) -> str | None:
+        """engine.fetch 的 cache=True 便捷包装，供 registry/cli 抓元数据用。"""
+        return self.fetch(
+            url, retries=retries, method=method, data=data, headers=headers, cache=True
+        )
 
     def fetch_chapter(self, url: str, parser, max_pages: int = 10) -> str | None:
         """下载单章（含分页），返回合并后的正文。"""

@@ -8,7 +8,7 @@ log = get_logger("search")
 def search_and_pick(keyword, engine, registry):
     """聚合搜索 + 交互式编号选择，返回目录页 URL 或 None（取消）。"""
     log.info("'%s' 聚合搜索所有站点...", keyword)
-    results = registry.search_all(keyword, engine.fetch)
+    results = registry.search_all(keyword, engine.cached_fetch)
     if not results:
         log.info("未找到结果")
         return None

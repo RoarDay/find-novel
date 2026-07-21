@@ -162,13 +162,13 @@ def _booklist_add(name: str, url: str) -> None:
             engine = DownloadEngine(delay=DEFAULT_DELAY)
             registry = ParserRegistry()
             parser = registry.get_parser(url)
-            html = engine.fetch(url, headers=parser.headers)
+            html = engine.cached_fetch(url, headers=parser.headers)
             title = url
             blurb = ""
             if html:
                 # ponytail: get_blurb 内部会重新 fetch，sub-optimal 但 parser API
                 # 设计如此；保持一致而非绕开。
-                blurb = parser.get_blurb(url, engine.fetch)
+                blurb = parser.get_blurb(url, engine.cached_fetch)
                 from bs4 import BeautifulSoup
                 soup = BeautifulSoup(html, "lxml")
                 h1 = soup.select_one("h1")
@@ -227,7 +227,7 @@ def main():
         out = {}
         for u in args.blurb:
             try:
-                out[u] = registry.get_parser(u).get_blurb(u, engine.fetch)
+                out[u] = registry.get_parser(u).get_blurb(u, engine.cached_fetch)
             except Exception:
                 out[u] = ""
         _json_dump(out)
@@ -236,13 +236,13 @@ def main():
         out = {}
         for u in args.chapters:
             try:
-                out[u] = registry.get_parser(u).get_chapter_titles(u, engine.fetch, args.top)
+                out[u] = registry.get_parser(u).get_chapter_titles(u, engine.cached_fetch, args.top)
             except Exception:
                 out[u] = []
         _json_dump(out)
         return
     if args.json and args.search:
-        results = registry.search_all(args.search, engine.fetch)
+        results = registry.search_all(args.search, engine.cached_fetch)
         if config.enable_history:
             try:
                 db.record_search(args.search, len(results))
@@ -255,14 +255,14 @@ def main():
     if args.json and args.category and args.source:
         try:
             p = registry.get_by_source(args.source)
-            _json_dump([_r_dict(r) for r in p.get_category(args.category, engine.fetch)])
+            _json_dump([_r_dict(r) for r in p.get_category(args.category, engine.cached_fetch)])
         except Exception as e:
             _json_dump({"error": str(e)})
         return
     if args.json and args.rank and args.source:
         try:
             p = registry.get_by_source(args.source)
-            _json_dump([_r_dict(r) for r in p.get_rank(args.rank, engine.fetch)])
+            _json_dump([_r_dict(r) for r in p.get_rank(args.rank, engine.cached_fetch)])
         except Exception as e:
             _json_dump({"error": str(e)})
         return
