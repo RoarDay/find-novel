@@ -52,3 +52,31 @@ def test_search_all_swallows_single_failure():
         assert isinstance(results, list)
     finally:
         p.search = original
+
+
+def test_search_all_concurrent_preserves_order_and_isolates_failure():
+    """注入 3 个假 parser（a, b-抛异常, c），验证并发后顺序=注册顺序 + b 被隔离。"""
+    from novel_crawler.base import SearchResult
+
+    class _Fake:
+        def __init__(self, domain, res):
+            self.domain = domain
+            self._res = res
+
+        def search(self, keyword, fetch):
+            if isinstance(self._res, Exception):
+                raise self._res
+            return self._res
+
+    reg = ParserRegistry()
+    reg._parsers = {
+        "a.com": _Fake("a.com", [SearchResult(title="a1", url="ua", source="a.com")]),
+        "b.com": _Fake("b.com", RuntimeError("b boom")),
+        "c.com": _Fake("c.com", [
+            SearchResult(title="c1", url="uc1", source="c.com"),
+            SearchResult(title="c2", url="uc2", source="c.com"),
+        ]),
+    }
+    results = reg.search_all("kw", fetch=lambda *a, **k: "")
+    # b 失败被隔离；顺序 = a 的结果在前，c 的在后
+    assert [r.title for r in results] == ["a1", "c1", "c2"]

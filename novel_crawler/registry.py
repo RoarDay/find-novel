@@ -1,5 +1,6 @@
 """解析器注册中心：根据 URL 自动匹配对应的站点解析器。"""
 
+import concurrent.futures
 import importlib
 import inspect
 import os
@@ -59,11 +60,26 @@ class ParserRegistry:
     def search_all(
         self, keyword: str, fetch: Callable[..., str | None]
     ) -> list[SearchResult]:
-        """聚合搜索所有已注册站点，单站失败不影响其它。"""
-        all_results: list[SearchResult] = []
-        for parser in self._parsers.values():
+        """并发聚合搜索所有已注册站点，单站失败不影响其它。
+
+        结果按站点注册顺序聚合（稳定）；线程数 = min(8, 站点数)。
+        requests.Session 线程安全（download_all 已用线程池验证）。
+        """
+        parsers = list(self._parsers.values())
+
+        def run(parser: BaseParser) -> list[SearchResult]:
             try:
-                all_results.extend(parser.search(keyword, fetch))
+                return parser.search(keyword, fetch)
             except Exception as e:
                 log.warning("%s 搜索失败: %s", parser.domain, e)
+                return []
+
+        all_results: list[SearchResult] = []
+        if not parsers:
+            return all_results
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(8, len(parsers))
+        ) as executor:
+            for res in executor.map(run, parsers):
+                all_results.extend(res)
         return all_results
