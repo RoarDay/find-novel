@@ -9,6 +9,7 @@ EXPECTED_SITES = {
     "qidian.com",
     "qimao.com",
     "faloo.com",
+    "fanqienovel.com",
 }
 
 
